@@ -1,7 +1,6 @@
 const mysql = require("mysql");
 const inquirer = require("inquirer");
 const table = require("console.table");
-
 const questions = require("./lib/questions");
 
 const connection = mysql.createConnection({
@@ -17,46 +16,55 @@ connection.connect(err => {
 		console.error(`error connecting: ${err.stack}`);
 		return;
 	}
-
-	console.log(`connected as id ${connection.threadId}`);
+	// console.log(`connected as id ${connection.threadId}`);
 });
 
-function init() {
-	inquirer.prompt(questions.initQue).then(answer => {
-		primary(answer);
-	});
-}
-
 // defining functions to run the app.
-
 function add() {
 	inquirer
 		.prompt(questions.addQue)
 		.then(answer => {
-			console.log(`first inquirer inside add();`);
 			// primary(answer);
 			switch (answer.whichAdd) {
 				case "ADD: EMPLOYEE":
-					inquirer.prompt(questions.addEmp).then(empAnswers => {
-						let addedEmp = `${empAnswers.empFirstName}, ${empAnswers.empLastName}, ${empAnswers.role_id}, ${empAnswers.role}`;
+					connection.query(`SELECT id, title FROM role`, function(err, res) {
+						if (err) throw err;
 
-						console.log(addedEmp);
+						const q = questions.addEmp;
 
-						connection.query(
-							`INSERT INTO employee (first_name, last_name, role_id, manager_id) VALUES (${addedEmp})`,
-							function(error, rows) {
-								if (error) throw error;
+						const newQuestion = {
+							type: "list",
+							message: "What is the employee's role?",
+							name: "role_dep",
+							choices: res.map(row => row.title) //['sales', ...]
+						};
 
-								init();
-							}
-						);
+						q.push(newQuestion);
+
+						inquirer.prompt(questions.addEmp).then(empAnswers => {
+							// string values must have "", or additional `` around template literal to represent a string value;
+
+							const role_id = res.find(row => row.title === empAnswers.role_dep)
+								.id;
+
+							let addedEmp = `'${empAnswers.empFirstName}', '${empAnswers.empLastName}', '${empAnswers.role_dep}', ${role_id}`;
+
+							connection.query(
+								`INSERT INTO employee (first_name, last_name, role, role_id) VALUES (${addedEmp})`,
+								function(error, rows) {
+									if (error) throw error;
+
+									init();
+								}
+							);
+						});
 					});
-
 					return;
 
 				case "ADD: DEPARTMENT":
 					inquirer.prompt(questions.addEmp).then(depAnswers => {
-						let addedDep = `${depAnswers.depName}`;
+						// string values must have "", or additional `` around template literal to represent a string value;
+						let addedDep = `'${depAnswers.depName}'`;
 
 						console.log(addedDep);
 
@@ -73,7 +81,8 @@ function add() {
 
 				case "ADD: ROLE":
 					inquirer.prompt(questions.addEmp).then(roleAnswers => {
-						let addedRole = `${roleAnswers.roleTitle}, ${roleAnswers.roleSalary}, ${roleAnswers.roleDep_id}`;
+						// string values must have "", or additional `` around template literal to represent a string value;
+						let addedRole = `'${roleAnswers.roleTitle}', ${roleAnswers.roleSalary}, ${roleAnswers.roleDep_id}`;
 
 						console.log(addedRole);
 
@@ -82,7 +91,6 @@ function add() {
 							function(error, rows) {
 								if (error) throw error;
 
-								// return console.table(rows);
 								init();
 							}
 						);
@@ -101,30 +109,91 @@ function remove() {
 	});
 }
 
-function displayStaff() {
-	// display the staff here;
-}
-
 function change() {
-	inquirer.prompt(questions.cngQue).then(answer => {
-		primary(answer);
+	console.log("\n");
+	connection.query("SELECT * FROM employee", (err, res) => {
+		if (err) throw err;
+
+		const colNames = Object.keys(res[0]);
+
+		console.log(`-- press arrow key for next selection --`);
+
+		inquirer
+			.prompt({
+				// prompt for the dataPacket, and select the names from dataRow;
+				name: "character",
+				type: "rawlist",
+				message: "What entry would you like to make a change on?",
+				choices: function() {
+					return res.map(item => {
+						return `${item.first_name} ${item.last_name}`;
+					});
+				}
+			})
+			.then(answer1 => {
+				// console.log(answer1);
+
+				inquirer
+					.prompt([
+						// prompt for the column to update;
+						{
+							type: "list",
+							message: "Which column do you want to update?",
+							name: "whichCol",
+							choices: colNames
+						},
+						// prompt for the new value;
+						{
+							type: "input",
+							message: "What the new value?",
+							name: "newVal"
+						}
+					])
+					.then(answer2 => {
+						// console.log(answer2);
+
+						// lastName is pulled from the selection in the
+						// character prompt and split, then selecting
+						// the second index {item.last_name};
+						let lastName = answer1.character.split(" ")[1];
+
+						// set the id to be of higher scope than the
+						// foreach loop where it is collected;
+						let id;
+
+						res.forEach(dataRow => {
+							if (dataRow.last_name == lastName) {
+								id = dataRow.id;
+								console.log(dataRow);
+							}
+						});
+
+						// UPDATE query with WHERE clause to define
+						// which obj/dataRow to rewrite;
+						console.log(answer2.whichCol);
+						connection.query(
+							`UPDATE employee SET ${answer2.whichCol} = ? WHERE id = ?`,
+							[answer2.newVal, id],
+							(err, res) => {
+								if (err) throw err;
+								console.log(res);
+							}
+						);
+					});
+			});
 	});
 }
 
 function viewStaff() {
-	// create questions for employee, role & department
-
 	inquirer
 		.prompt(questions.viewQue)
 		.then(answer => {
-			console.log(`first inquirer inside add();`);
-			// primary(answer);
 			switch (answer.view) {
 				case "VIEW ALL EMPLOYEES":
 					connection.query("SELECT * FROM employee", (err, res) => {
 						if (err) throw err;
-						console.table(res);
-						console.log(`press arrow key for next selection`);
+						console.table("\n", res);
+						console.log(`-- press arrow key for next selection --`);
 					});
 					init();
 					return;
@@ -132,8 +201,8 @@ function viewStaff() {
 				case "VIEW ALL DEPARTMENTS":
 					connection.query("SELECT * FROM department", (err, res) => {
 						if (err) throw err;
-						console.table(res);
-						console.log(`press arrow key for next selection`);
+						console.table("\n", res);
+						console.log(`-- press arrow key for next selection --`);
 					});
 
 					init();
@@ -142,8 +211,8 @@ function viewStaff() {
 				case "VIEW ALL ROLES":
 					connection.query("SELECT * FROM role", (err, res) => {
 						if (err) throw err;
-						console.table(res);
-						console.log(`press arrow key for next selection`);
+						console.table("\n", res);
+						console.log(`-- press arrow key for next selection --`);
 					});
 
 					init();
@@ -158,22 +227,29 @@ function viewStaff() {
 function primary(answer) {
 	switch (answer.firstQue) {
 		case "ADD: EMPLOYEE, DEPARTMENT, ROLE":
-			console.log(`primary();`);
+			// add case
 			add();
 			break;
 		case "REMOVE: EMPLOYEE, DEPARTMENT, ROLE":
-			console.log("case 2");
+			// remove case
 			remove();
 			break;
 		case "VIEW ALL STAFF":
+			// view case
 			viewStaff();
-
 			break;
-		case "CHANGE EMPLOYEE'S: ROLE, MANAGER":
-			console.log("case 4");
+		case "CHANGE: EMPLOYEE's ROLE":
+			// change case
 			change();
 			break;
 	}
+}
+
+// initialize function to start the first inquirer;
+function init() {
+	inquirer.prompt(questions.initQue).then(answer => {
+		primary(answer);
+	});
 }
 
 init();
