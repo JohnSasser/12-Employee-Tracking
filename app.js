@@ -6,7 +6,7 @@ const questions = require("./lib/questions");
 const connection = mysql.createConnection({
 	host: "localhost",
 	user: "root",
-	password: "root",
+	password: "",
 	database: "company_db"
 });
 
