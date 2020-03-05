@@ -19,7 +19,6 @@ connection.connect(err => {
 	// console.log(`connected as id ${connection.threadId}`);
 });
 
-// defining functions to run the app.
 function add() {
 	inquirer
 		.prompt(questions.addQue)
@@ -103,6 +102,7 @@ function add() {
 		});
 }
 
+// function under construction;
 function remove() {
 	inquirer.prompt(questions.rmvQue).then(answer => {
 		primary(answer);
@@ -114,13 +114,14 @@ function change() {
 	connection.query("SELECT * FROM employee", (err, res) => {
 		if (err) throw err;
 
+		// collect the key values from dataRow[0] on employee [id, first_name, last_name, role, etc...];
 		const colNames = Object.keys(res[0]);
 
 		console.log(`-- press arrow key for next selection --`);
 
 		inquirer
 			.prompt({
-				// prompt for the dataPacket, and select the names from dataRow;
+				// prompt for the dataPacket to change, and select the names from that dataRow;
 				name: "character",
 				type: "rawlist",
 				message: "What entry would you like to make a change on?",
@@ -160,7 +161,7 @@ function change() {
 						// set the id to be of higher scope than the
 						// foreach loop where it is collected;
 						let id;
-
+						// loop over data row to find matching last name and collect the row id;
 						res.forEach(dataRow => {
 							if (dataRow.last_name == lastName) {
 								id = dataRow.id;
@@ -168,9 +169,9 @@ function change() {
 							}
 						});
 
+						console.log(answer2.whichCol);
 						// UPDATE query with WHERE clause to define
 						// which obj/dataRow to rewrite;
-						console.log(answer2.whichCol);
 						connection.query(
 							`UPDATE employee SET ${answer2.whichCol} = ? WHERE id = ?`,
 							[answer2.newVal, id],
@@ -190,6 +191,7 @@ function viewStaff() {
 		.then(answer => {
 			switch (answer.view) {
 				case "VIEW ALL EMPLOYEES":
+					// query all dataRows
 					connection.query("SELECT * FROM employee", (err, res) => {
 						if (err) throw err;
 						console.table("\n", res);
@@ -199,6 +201,7 @@ function viewStaff() {
 					return;
 
 				case "VIEW ALL DEPARTMENTS":
+					// query all dataRows
 					connection.query("SELECT * FROM department", (err, res) => {
 						if (err) throw err;
 						console.table("\n", res);
@@ -209,6 +212,7 @@ function viewStaff() {
 					return;
 
 				case "VIEW ALL ROLES":
+					// query all dataRows
 					connection.query("SELECT * FROM role", (err, res) => {
 						if (err) throw err;
 						console.table("\n", res);
